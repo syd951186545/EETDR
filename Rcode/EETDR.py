@@ -334,7 +334,7 @@ class EETDR:
 
 
 if __name__ == "__main__":
-    # Bt = build_tensor.Build_tensor(infile="C:/Users/Syd/OneDrive/Work/EETDR/data/yelp_recursive_train.entry",
+    # Bt = build_tensor.Build_tensor(infile="C:/Users/Syd/OneDrive/Work/EETDR/data/train.entry",
     #                                outfile="E:/PYworkspace/EETDR/result/UIA.csv")
     # X = Bt.build_tensor(tensor=False, matix=True, sprasefile=False)
     # Y = Bt.build_UA()
@@ -367,3 +367,4 @@ if __name__ == "__main__":
         rec_errors = fine.eetdr_SGDonce()
         if rec_errors[-1] < 10e-5:
             flag = False
+    logfile.close()

@@ -3,6 +3,7 @@ import tensorly as tl
 import tensorflow as tf
 from scipy import sparse as sp
 
+pathdir = "E:/PYworkspace/EETDR"
 
 class Build_tensor:
 
@@ -107,13 +108,13 @@ class Build_tensor:
     def build_part_tensor(self):
         print("正在构建张量......")
         countt = 0
-        TensorX = np.ndarray(shape=(3000, 3000, 104), dtype=np.float)
+        TensorX = np.ndarray(shape=(1000, 1000, 104), dtype=np.float)
         # TensorX = tl.zeros(shape=(self.num_users,self.num_items,self.num_features))
         # TensorX = tf.SparseTensor()
         # TensorX = sp.coo_matrix(shape=(self.num_users,self.num_items,self.num_features))
         for piece in self.pieces:
             for feature in piece[3]:
-                if piece[0] < 3000 and piece[1] < 3000:
+                if piece[0] < 1000 and piece[1] < 1000:
                     TensorX[piece[0]][piece[1]][feature[0]] += np.int16(feature[1])
                     countt += 1
 
@@ -131,29 +132,31 @@ class Build_tensor:
         Sparsemat = Sparsemat.reshape((len(i_index), 4))
 
         print("构建user-aspect真实矩阵......")
-        UA = np.zeros(shape=(3000, self.num_features + 1))
+        UA = np.zeros(shape=(1000, self.num_features + 1))
         for piece in self.pieces:
             for feature in piece[3]:
-                if piece[0] < 3000:
+                if piece[0] < 1000:
                     UA[piece[0]][feature[0]] += 1
         print("构建完成")
 
         print("构建item-aspect真实矩阵......")
-        IA = np.zeros(shape=(3000, self.num_features + 1))
+        IA = np.zeros(shape=(1000, self.num_features + 1))
         for piece in self.pieces:
             for feature in piece[3]:
-                if piece[1] < 3000:
+                if piece[1] < 1000:
                     IA[piece[1]][feature[0]] += 1
         print("构建完成")
 
-        np.save("E:/PYworkspace/EETDR/result/X3000", Sparsemat)
-        np.save("E:/PYworkspace/EETDR/result/UA3000", UA)
-        np.save("E:/PYworkspace/EETDR/result/IA3000", IA)
-        np.save("E:/PYworkspace/EETDR/result/TensorX", TensorX)
+        np.save("E:/PYworkspace/EETDR/result/X1000", Sparsemat)
+        np.save("E:/PYworkspace/EETDR/result/UA1000", UA)
+        np.save("E:/PYworkspace/EETDR/result/IA1000", IA)
+        np.save("E:/PYworkspace/EETDR/result/TensorX1000", TensorX)
         return TensorX, UA, IA
+
+    # def build_test_data(self):
 
 
 if __name__ == "__main__":
-    bt = Build_tensor(infile="C:\\Users\Syd\OneDrive\Work\EETDR\data\yelp_recursive_train.entry",
+    bt = Build_tensor(infile="E:\PYworkspace\EETDR\data\origindata\yelp_recursive_train.entry",
                       outfile="E:/PYworkspace/EETDR/result/UIA.sparsemat")
     print(bt.build_part_tensor())
