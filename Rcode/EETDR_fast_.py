@@ -3,6 +3,8 @@ minibatch and less reconstruction support a faster compute
 """
 
 import random
+from typing import List, Any
+
 import pandas as pd
 import tensorly as tl
 import numpy as np
@@ -28,8 +30,8 @@ class EETDR:
         self.Z = Z
         self.num_data = X.shape[0]
         self.num_users, self.num_items, self.num_aspects = int(Y.shape[0]), int(Z.shape[0]), int(Y.shape[1])  # 数量
-        self.r = 32  # 显式因子维度
-        self.r1, self.r2, self.r3 = 64, 64, 32  # 三个分解后矩阵隐式因子的数量
+        self.r = 64  # 显式因子维度
+        self.r1, self.r2, self.r3 = 32, 32, 1  # 三个分解后矩阵隐式因子的数量
         print("初始化U1，I1，A1，U2，I2，A2")
         # 初始值U，I，A矩阵由tucker分解一次得到
         self.G = core_G
@@ -44,20 +46,21 @@ class EETDR:
         self.A1 = initA[:, self.r3:]
 
         print("初始化参数lamda，学习率theta")
-        self.lamda = 0.001
-        self.lamdax = 0.1
-        self.lamday = 0.1
+        self.ita = 0.0001  # 所有变量的学习率 yita
+        self.lamdax = 0.3  # Y - U1 * A1
+        self.lamday = 0.3  # Z - I1 * A1
         self.lamda1 = 0.1  # U1，I1，A1的正则化参数
         self.lamda2 = 0.1  # U2，I2，A2的正则化参数
         self.lamda3 = 0.1  # 核张量G的正则化参数
-        self.theta1 = 0.1  # U2随机梯度下降学习率
-        self.theta2 = 0.1  # I2随机梯度下降学习率
-        self.theta3 = 0.1  # A2随机梯度下降学习率
-        self.theta4 = 0.1
-        self.theta5 = 0.1
-        self.theta6 = 0.1
+
         self.rec_errors = []
         return
+    def get_TensorApproximateXijk(self,i,j,k):
+        rr1 = self.r + self.r1
+        rr2 = self.r + self.r2
+        rr3 = self.r + self.r3
+
+
 
     def eetdr_SGDonce(self, TensorX_approximation):
 
@@ -70,9 +73,10 @@ class EETDR:
         I2 = self.I2
         A1 = self.A1
         A2 = self.A2
+        G = self.G
 
         print("稀疏矩阵小批量(10)梯度下降", file=logfile)
-        for minibatch in range(10):
+        for minibatch in range(20):
             print("小批量次数{}".format(minibatch))
             ##############################################################################################
             # U2的随机梯度下降更新########################################################################
@@ -99,16 +103,16 @@ class EETDR:
                         e_ijk = self.TensorX[i_once][j][k] - TensorX_approximation[i_once][j][k]
                         sum2 = 0
                         for b1 in range(rr2):
-                            var3 = self.I[j][b1]
+                            var3 = I[j][b1]
                             for c1 in range(rr3):
-                                temp = self.G[a][b1][c1] * var3 * self.A[k][c1]
+                                temp = G[a][b1][c1] * var3 * A[k][c1]
                                 sum2 += temp
-                        sum_tensorDec = sum_tensorDec + self.lamda * e_ijk * sum2
+                        sum_tensorDec = sum_tensorDec + e_ijk * sum2
                 if a < self.r1:
                     # 完全负梯度
                     neg_gradient = sum_tensorDec - self.lamda2 * U2[i_once][a]
                     # U2ia更新
-                    self.U2[i_once][a] = U2[i_once][a] + self.theta1 * neg_gradient
+                    self.U2[i_once][a] = U2[i_once][a] + self.ita * neg_gradient
 
                     # print("U2[{}][{}]  = {}".format(i_once, a, U2[i_once][a]), file=logfile)
                     # print("↑完全负梯度{}".format(neg_gradient), file=logfile)
@@ -121,7 +125,7 @@ class EETDR:
                     neg_gradient = sum_tensorDec - self.lamda2 * U1[i_once][
                         a - self.r1] + self.lamdax * explicit_gradient1
                     # U1ia更新
-                    self.U1[i_once][a - self.r1] = U1[i_once][a - self.r1] + self.theta1 * neg_gradient
+                    self.U1[i_once][a - self.r1] = U1[i_once][a - self.r1] + self.ita * neg_gradient
                     # print("U1[{}][{}]  = {}".format(i_once, a - self.r1, U1[i_once][a - self.r1]), file=logfile)
                     # print("↑完全负梯度{}".format(neg_gradient), file=logfile)
 
@@ -143,16 +147,16 @@ class EETDR:
                         e_ijk = self.TensorX[i][j_once][k] - TensorX_approximation[i][j_once][k]
                         sum2 = 0
                         for a1 in range(rr1):
-                            var3 = self.U[i][a1]
+                            var3 = U[i][a1]
                             for c1 in range(rr3):
-                                temp = self.G[a1][b][c1] * var3 * self.A[k][c1]
+                                temp = G[a1][b][c1] * var3 * A[k][c1]
                                 sum2 += temp
-                        sum_tensorDec = sum_tensorDec + self.lamda * e_ijk * sum2
+                        sum_tensorDec = sum_tensorDec + e_ijk * sum2
                 if b < self.r2:
                     # 完全负梯度
                     neg_gradient = sum_tensorDec - self.lamda2 * I2[j_once][b]
                     # I2jb更新
-                    self.I2[j_once][b] = I2[j_once][b] + self.theta2 * neg_gradient
+                    self.I2[j_once][b] = I2[j_once][b] + self.ita * neg_gradient
                     # print("I2[{}][{}]  = {}".format(j_once, b, I2[j_once][b]), file=logfile)
                     # print("↑完全负梯度{}".format(neg_gradient), file=logfile)
 
@@ -164,7 +168,7 @@ class EETDR:
                     # 完全负梯度
                     neg_gradient = sum_tensorDec - self.lamda2 * I1[j_once][b - self.r2] + explicit_gradient2
                     # I1jb更新
-                    self.I1[j_once][b - self.r2] = I1[j_once][b - self.r2] + self.theta2 * neg_gradient
+                    self.I1[j_once][b - self.r2] = I1[j_once][b - self.r2] + self.ita * neg_gradient
                     # print("I1[{}][{}]  = {}".format(j_once, b - self.r2, I1[j_once][b - self.r2]), file=logfile)
                     # print("↑完全负梯度{}".format(neg_gradient), file=logfile)
 
@@ -186,16 +190,16 @@ class EETDR:
                         e_ijk = self.TensorX[i][j][k_once] - TensorX_approximation[i][j][k_once]
                         sum2 = 0
                         for a1 in range(rr1):
-                            var3 = self.U[i][a1]
+                            var3 = U[i][a1]
                             for b1 in range(rr2):
-                                temp = self.G[a1][b1][c] * self.I[j][b1] * var3
+                                temp = G[a1][b1][c] * I[j][b1] * var3
                                 sum2 += temp
-                        sum_tensorDec = sum_tensorDec + self.lamda * e_ijk * sum2
+                        sum_tensorDec = sum_tensorDec + e_ijk * sum2
                 if c < self.r3:
                     # 完全负梯度
                     neg_gradient = sum_tensorDec - self.lamda2 * A2[k_once][c]
                     # A2kc更新
-                    self.A2[k_once][c] = A2[k_once][c] + self.theta3 * neg_gradient
+                    self.A2[k_once][c] = A2[k_once][c] + self.ita * neg_gradient
                     # print("A2[{}][{}]  = {}".format(k_once, c, A2[k_once][c]), file=logfile)
                     # print("↑完全负梯度{}".format(neg_gradient), file=logfile)
 
@@ -212,7 +216,7 @@ class EETDR:
                     neg_gradient = sum_tensorDec - self.lamda2 * A1[k_once][
                         c - self.r3] + explicit_gradient3 + explicit_gradient4
                     # A1kc更新
-                    self.A1[k_once][c - self.r3] = A1[k_once][c - self.r3] + self.theta3 * neg_gradient
+                    self.A1[k_once][c - self.r3] = A1[k_once][c - self.r3] + self.ita * neg_gradient
                     # print("A1[{}][{}]  = {}".format(k_once, c - self.r3, A1[k_once][c - self.r3]), file=logfile)
                     # print("↑完全负梯度{}".format(neg_gradient), file=logfile)
 
@@ -222,56 +226,39 @@ class EETDR:
                                  np.concatenate((self.I1, self.I2), axis=1), \
                                  np.concatenate((self.A1, self.A2), axis=1)
         factors = [self.U, self.I, self.A]
-        rec_errors = []
         print("重构核张量")
         modes1 = list(range(_tucker.T.ndim(self.TensorX)))
-        for index, mode in enumerate(modes1):
-            self.G = _tucker.multi_mode_dot(self.TensorX, factors, modes=modes1, transpose=True)
+        self.G = _tucker.multi_mode_dot(self.TensorX, factors, modes=modes1, transpose=True)
         print("重构X张量")
         modes2 = list(range(_tucker.T.ndim(self.G)))
-        for index, mode in enumerate(modes2):
-            TensorX_approximation = _tucker.multi_mode_dot(self.G, factors, modes=modes2, transpose=False)
-        Y_approximation = U1.dot(A1.transpose())
-        Z_approximation = I1.dot(A1.transpose())
-
-
+        TensorX_approximation = _tucker.multi_mode_dot(self.G, factors, modes=modes2, transpose=False)
         print("计算重构误差")
-        rec_X = 0
-        rec_Y = 0
-        rec_Z = 0
-        regularizationU = _tucker.T.norm(self.TensorX, 2)
-        for data in range(self.num_data):
-            rec_Y = rec_Y + self.Y[self.X[data][0]][self.X[data][2]]-Y_approximation[self.X[data][0]][self.X[data][2]]
-            rec_Z = rec_Z + self.Z[self.X[data][1]][self.X[data][2]]-Z_approximation[self.X[data][1]][self.X[data][2]]
-            rec_X = rec_X + (self.X[data][3] - TensorX_approximation[self.X[data][0]][self.X[data][1]][
-                self.X[data][2]])
-        rec_error = rec_X+rec_Y+rec_Z
-        self.rec_errors.append(rec_error / self.num_data)
-        print("Once OK，rec={}".format(self.rec_errors))
-        print("Once OK，rec={}".format(self.rec_errors), file=logfile)
-        if len(rec_errors) > 2:
-            print("Once OK，总误差下降幅度{}".format(self.rec_errors[-1]-self.rec_errors[-2]))
-            print("Once OK，总误差下降幅度{}".format(self.rec_errors[-1] - self.rec_errors[-2]), file=logfile)
-
         ####################################################################################################
-        # Xrec_tensor = self.TensorX-TensorX_approximation
-        # print(_tucker.T.norm(Xrec_tensor, 2))
-        #
-        # norm_tensor = _tucker.T.norm(self.TensorX, 2)
-        # rec_error = _tucker.sqrt(abs(norm_tensor ** 2 - _tucker.T.norm(TensorX_approximation, 2) ** 2)) / norm_tensor
-        # norm_Y = _tucker.T.norm(self.Y, 2)
-        # rec_Y = _tucker.sqrt(abs(norm_Y ** 2 - _tucker.T.norm((U1.dot(A1.transpose())), 2) ** 2)) / norm_Y
-        # norm_Z = _tucker.T.norm(self.Z, 2)
-        # rec_Z = _tucker.sqrt(abs(norm_Z ** 2 - _tucker.T.norm((I1.dot(A1.transpose())), 2) ** 2)) / norm_Z
-        # final_error = rec_error + rec_Y + rec_Z
-        # print("rec_error={} rec_Y={} rec_Z={} final={}".format(rec_error, rec_Y, rec_Z, final_error))
-        # print("rec_error={} rec_Y={} rec_Z={} final={}".format(rec_error, rec_Y, rec_Z, final_error),
-        #       file=logfile)
-        # self.rec_errors.append(final_error)
-        # print("Once OK，rec={}".format(self.rec_errors), file=logfile)
-        # if len(rec_errors) > 2:
-        #     print("Once OK，总误差下降幅度{}".format(self.rec_errors[-2]-self.rec_errors[-1]))
-        #     print("Once OK，总误差下降幅度{}".format(self.rec_errors[-2] - self.rec_errors[-1]), file=logfile)
+        L2_U2 = _tucker.T.norm(self.U2, 2)
+        L2_U1 = _tucker.T.norm(self.U1, 2)
+        L2_I2 = _tucker.T.norm(self.I2, 2)
+        L2_I1 = _tucker.T.norm(self.I1, 2)
+        L2_A2 = _tucker.T.norm(self.A2, 2)
+        L2_A1 = _tucker.T.norm(self.A1, 2)
+        L2_G = _tucker.T.norm(self.G, 2)
+        norm_tensor = _tucker.T.norm(self.TensorX, 2)
+        rec_error = _tucker.sqrt(abs(norm_tensor ** 2 - _tucker.T.norm(TensorX_approximation, 2) ** 2)) / norm_tensor
+        norm_Y = _tucker.T.norm(self.Y, 2)
+        rec_Y = _tucker.sqrt(abs(norm_Y ** 2 - _tucker.T.norm((U1.dot(A1.transpose())), 2) ** 2)) / norm_Y
+        norm_Z = _tucker.T.norm(self.Z, 2)
+        rec_Z = _tucker.sqrt(abs(norm_Z ** 2 - _tucker.T.norm((I1.dot(A1.transpose())), 2) ** 2)) / norm_Z
+        final_error = rec_error + self.lamdax*rec_Y + self.lamday*rec_Z + self.lamda1*(L2_U1+L2_A1+L2_I1)+self.lamda2*(L2_U2+L2_A2+L2_I2)+self.lamda3*L2_G
+
+        print("rec_error={} rec_Y={} rec_Z={} final={}".format(rec_error, rec_Y, rec_Z, final_error))
+        print(" finalY+Z={}".format(rec_Y+rec_Z),
+              file=logfile)
+        print("rec_error={} rec_Y={} rec_Z={} final={}".format(rec_error, rec_Y, rec_Z, final_error),
+              file=logfile)
+        self.rec_errors.append(final_error)
+        print("Once OK，rec={}".format(self.rec_errors), file=logfile)
+        if len(self.rec_errors) > 2:
+            print("Once OK，总误差下降幅度{}".format(self.rec_errors[-2]-self.rec_errors[-1]))
+            print("Once OK，总误差下降幅度{}".format(self.rec_errors[-2] - self.rec_errors[-1]), file=logfile)
 
         return self.rec_errors, self.G, self.U, self.I, self.A, TensorX_approximation
 
@@ -292,7 +279,7 @@ if __name__ == "__main__":
     Y1 = np.load(pathdir + "/data/preprodata/UA1000.npy")
     Z1 = np.load(pathdir + "/data/preprodata/IA1000.npy")
     TensorX1 = np.load(pathdir + "/data/preprodata/TensorX1000.npy")
-    if already == 35:
+    if already == 0:
         initU = np.load(pathdir + "/data/preprodata/initU1000.npy")
         initI = np.load(pathdir + "/data/preprodata/initI1000.npy")
         initA = np.load(pathdir + "/data/preprodata/initA1000.npy")
@@ -320,15 +307,15 @@ if __name__ == "__main__":
     count = already
     while flag:
         count += 1
-        logfile = open(pathdir + "/result/log/log_fast--.txt", "a")
+        logfile = open(pathdir + "/result/log/log_fast_88.txt", "a")
         print("从第0次开始使用小批量，第{}次小批量(10)".format(count), file=logfile)
         rec_errors, reG, reU, reI, reA, TensorX_approximation_iter = fine.eetdr_SGDonce(TensorX_approximation_iter)
-        np.save(pathdir + "/result/intermediat_result2/1000/reG" + str(count), reG)
-        np.save(pathdir + "/result/intermediat_result2/1000/reU" + str(count), reU)
-        np.save(pathdir + "/result/intermediat_result2/1000/reI" + str(count), reI)
-        np.save(pathdir + "/result/intermediat_result2/1000/reA" + str(count), reA)
+        np.save(pathdir + "/result/intermediat_result2/1000_2/reG" + str(count), reG)
+        np.save(pathdir + "/result/intermediat_result2/1000_2/reU" + str(count), reU)
+        np.save(pathdir + "/result/intermediat_result2/1000_2/reI" + str(count), reI)
+        np.save(pathdir + "/result/intermediat_result2/1000_2/reA" + str(count), reA)
         print(rec_errors)
         logfile.close()
-        if rec_errors[-1] < 2.0 or count > 100:
+        if rec_errors[-1] < 2.0 or count > 1000:
             flag = False
 
