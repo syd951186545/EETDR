@@ -107,16 +107,16 @@ class Build_tensor:
         print("构建完成")
         return IA
 
-    def build_part_tensor(self):
+    def build_part_tensor(self,number=300):
         print("正在构建张量......")
         countt = 0
-        TensorX = np.ndarray(shape=(1000, 1000, 105), dtype=np.float)
+        TensorX = np.ndarray(shape=(number, number, 105), dtype=np.float)
         # TensorX = tl.zeros(shape=(self.num_users,self.num_items,self.num_features))
         # TensorX = tf.SparseTensor()
         # TensorX = sp.coo_matrix(shape=(self.num_users,self.num_items,self.num_features))
         for piece in self.pieces:
             for feature in piece[3]:
-                if piece[0] < 1000 and piece[1] < 1000:
+                if piece[0] < number and piece[1] < number:
                     TensorX[piece[0]][piece[1]][feature[0]] += np.int16(feature[1])
                     countt += 1
 
@@ -133,50 +133,50 @@ class Build_tensor:
             Sparselist.append(k_index[count])
             Sparselist.append(TensorX[i_index[count]][j_index[count]][k_index[count]])
 
-        Sparsemat = np.array(Sparselist, dtype=np.int16)
+        Sparsemat = np.array(Sparselist, dtype=np.float)
         Sparsemat = Sparsemat.reshape((len(i_index), 4))
         print("构建user-item真实评分矩阵......")
-        R = np.zeros(shape=(1000, 1000))
+        R = np.zeros(shape=(number, number))
         for piece in self.pieces:
-            if piece[0] < 1000 and piece[1] < 1000:
+            if piece[0] < number and piece[1] < number:
                 R[piece[0]][piece[1]] = piece[2]
                 TensorX[piece[0]][piece[1]][104] = piece[2]
 
         print("构建user-aspect真实矩阵......")
-        UA = np.zeros(shape=(1000, self.num_features + 1))
+        UA = np.zeros(shape=(number, self.num_features + 1))
         for piece in self.pieces:
             for feature in piece[3]:
-                if piece[0] < 1000:
+                if piece[0] < number:
                     UA[piece[0]][feature[0]] += 1
-        for i in range(1000):
+        for i in range(number):
             for k1 in range(self.num_features):
                 if UA[i][k1] is not 0:
                     UA[i][k1] = 1 + (4 / (math.exp(-UA[i][k1]) + 1))
         print("构建完成")
 
         print("构建item-aspect真实矩阵......")
-        IA = np.zeros(shape=(1000, self.num_features + 1))
+        IA = np.zeros(shape=(number, self.num_features + 1))
         for piece in self.pieces:
             for feature in piece[3]:
-                if piece[1] < 1000:
+                if piece[1] < number:
                     IA[piece[1]][feature[0]] += 1
-        for j in range(1000):
+        for j in range(number):
             for k2 in range(self.num_features):
                 if IA[j][k2] is not 0:
                     IA[j][k2] = 1 + (4 / (math.exp(-IA[j][k2]) + 1))
         print("构建完成")
-        np.save("E:/PYworkspace/EETDR/data/preprodata/R1000", R)
-        np.save("E:/PYworkspace/EETDR/data/preprodata/X1000", Sparsemat)
-        np.save("E:/PYworkspace/EETDR/data/preprodata/UA1000", UA)
-        np.save("E:/PYworkspace/EETDR/data/preprodata/IA1000", IA)
-        np.save("E:/PYworkspace/EETDR/data/preprodata/TensorX1000", TensorX)
-        return TensorX, UA, IA
+        np.save("E:/PYworkspace/EETDR/data/preprodata/R"+str(number), R)
+        np.save("E:/PYworkspace/EETDR/data/preprodata/X"+str(number), Sparsemat)
+        np.save("E:/PYworkspace/EETDR/data/preprodata/UA"+str(number), UA)
+        np.save("E:/PYworkspace/EETDR/data/preprodata/IA"+str(number), IA)
+        np.save("E:/PYworkspace/EETDR/data/preprodata/TensorX"+str(number), TensorX)
+        return TensorX, UA, IA,Sparsemat
 
     # def build_test_data(self):
 
 
 if __name__ == "__main__":
-    bt = Build_tensor(infile="E:/PYworkspace/EETDR/data/yelp_recursive_data/train.entry",
+    bt = Build_tensor(infile="E:/PYworkspace/EETDR/data/yelp_recursive_data/New_train.txt",
                       outfile="E:/PYworkspace/EETDR/result/UIA.sparsemat")
-    TensorX, _, _ = bt.build_part_tensor()
-    print(TensorX[:,:,104])
+    TensorX, UA, IA,Sparsemate = bt.build_part_tensor()
+    print(UA,IA)

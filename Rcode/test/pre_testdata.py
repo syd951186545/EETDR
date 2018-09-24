@@ -3,7 +3,7 @@ import numpy as np
 pathdir = "E:/PYworkspace/EETDR"
 
 
-def get_infile(infile=pathdir + "/data/yelp_recursive_data/test.entry"):
+def get_infile(infile=pathdir + "/data/yelp_recursive_data/New_test.txt"):
     return infile
 
 
@@ -27,9 +27,13 @@ def load_data(num_users, num_items):
 
 def build_1000test_data_mat():
     x = load_data(1000, 1000)
-    np.save(pathdir+"/data/testdata/1000test_mat",x)
+    np.save(pathdir+"/data/testdata/1000test_mat", x)
     return x
 
+def build_300test_data_mat():
+    x = load_data(300, 300)
+    np.save(pathdir+"/data/testdata/300test_mat", x)
+    return x
 
 if __name__ == "__main__":
-    print(build_1000test_data_mat())
+    print(build_300test_data_mat()[8][3])
