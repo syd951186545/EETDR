@@ -1,6 +1,10 @@
+"""
+构建测试方法，实现结果的测试
+"""
 import numpy as np
 import metrics
 import tensorly
+import math
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -12,7 +16,7 @@ def get_testRating_mat():
 
 
 def get_re_tensor_element(num):
-    path = "E:/PYworkspace/EETDR/result/intermediat_result2/300_0.1"
+    path = "E:/PYworkspace/EETDR/result/intermediat_result2/300"
     core = np.load(path + "/reG" + num + ".npy")
     U = np.load(path + "/reU" + num + ".npy")
     I = np.load(path + "/reI" + num + ".npy")
@@ -95,21 +99,28 @@ def get_DCG(groundRating_mat, approximate_Rating_mat, recom_topK):
 def get_NDCG(DCG_rank_mat):
     num_users,num_recom_topK=DCG_rank_mat.shape
     avg_ndcg_score = 0.0
+    ndcg_scores = 0.0
+    testuser_num = 0
     for user in range(num_users):
         user_dcg_rank = DCG_rank_mat[user, :]
-        ndcg_score = metrics.get_ndcg(user_dcg_rank,num_recom_topK)
-        avg_ndcg_score += ndcg_score/num_users
-        print(ndcg_score)
+        ndcg_score = metrics.get_ndcg_2(user_dcg_rank,15,0,num_recom_topK)
+        if math.isnan(ndcg_score) is False:
+            ndcg_scores += ndcg_score
+            testuser_num += 1
+    if testuser_num is not 0:
+        avg_ndcg_score += ndcg_scores/testuser_num
     return avg_ndcg_score
 
 if __name__ == "__main__":
-    for num in range(12):
+    for num in range(120):
         numstring = str(num + 1)
         TensorX_approximation = reconstruct_tensor(numstring)
-        groundRating_mat = get_testRating_mat()
+        trueRating_mat = get_testRating_mat()
         approximate_Rating_mat = predict_score_rank(TensorX_approximation, 104, 300, 300, alpha=0.5)
-        DCG_rank_mat = get_DCG(groundRating_mat, approximate_Rating_mat, 100)
+        DCG_rank_mat = get_DCG(trueRating_mat, approximate_Rating_mat, 10)
         avg_ndcg_score = get_NDCG(DCG_rank_mat)
+
+        print(trueRating_mat[140][27],approximate_Rating_mat[140][27])
         print(avg_ndcg_score)
     # fig1 = plt.figure()
     # fig2 = plt.figure()

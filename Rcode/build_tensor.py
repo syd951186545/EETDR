@@ -1,3 +1,6 @@
+"""
+原始数据的预处理，转换成各种所需格式
+"""
 import numpy as np
 import tensorly as tl
 import tensorflow as tf

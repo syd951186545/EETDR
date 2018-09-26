@@ -1,3 +1,8 @@
+"""
+重新划分数据集，测试集中的数据不含有冷启动用户
+"""
+
+
 def get_entyfile(entyfile="E:/PYworkspace/EETDR/data/yelp_recursive_data/all.entry"):
     return entyfile
 
@@ -26,4 +31,5 @@ def load_data():
                     trainfile.write(line)
         print("拆分完成")
 
-load_data()
+if __name__ == "__main__":
+    load_data()

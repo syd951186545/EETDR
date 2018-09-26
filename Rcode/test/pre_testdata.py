@@ -1,3 +1,7 @@
+"""
+提取测试数据转换为用户产品矩阵：ground_true_test_rating_mat
+"""
+
 import numpy as np
 
 pathdir = "E:/PYworkspace/EETDR"

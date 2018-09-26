@@ -95,6 +95,10 @@ class EETDR:
             F_error = F_error + (N[index1[count]][index2[count]] - N_approx[index1[count]][index2[count]]) ** 2
         return F_error
 
+    def get_explicit_gradient(self,):
+        # TODO
+        return
+
     def eetdr_SGDonce(self):
         U = self.U
         I = self.I
@@ -135,14 +139,13 @@ class EETDR:
         ########################################################
         print("稀疏矩阵小批量(50)梯度下降")
         for minibatch in range(100):
-            print("小批量次数{}".format(minibatch))
             ##############################################################################################
             # U2的随机梯度下降更新########################################################################
             seed = np.random.randint(0, self.num_data)
             i_once = int(self.X[seed][0])  # 随机梯度下降， 随机选取第i个用户更新
             j_once = int(self.X[seed][1])  # 随机梯度下降， 随机选取第i个用户更新
             k_once = int(self.X[seed][2])  # 随机梯度下降， 随机选取第i个用户更新
-            print("updata[{}][{}][{}]".format(i_once, j_once, k_once))
+            # print("updata[{}][{}][{}]".format(i_once, j_once, k_once))
             rr1 = self.r + self.r1
             rr2 = self.r + self.r2
             rr3 = self.r + self.r3
@@ -153,6 +156,9 @@ class EETDR:
                 # print("U[{}][{}]  = {}".format(i_once, a, U[i_once][a]), file=logfile)
                 # 稀疏张量分解得到的负梯度
                 sum_tensorDec = 0
+                explicit_gradient1 = 0
+                samek = -1
+                notsamek_flag = True
                 # 如下计算负梯度，公式详见论文
                 # 稀疏张量的取下标。
                 for data in range(self.num_data):
@@ -172,22 +178,32 @@ class EETDR:
                                 temp = G[a][b1][c1] * var3 * A[k][c1]
                                 sum2 += temp
                         sum_tensorDec = sum_tensorDec + e_ijk * sum2
+                        # 避免计算同一个k
+                        if samek == k:
+                            notsamek_flag = False
+                        else:
+                            samek = k
+                            notsamek_flag = True
+                        if a > self.r1 and notsamek_flag is True:
+                            sum3 = 0
+                            for o in range(self.r):
+                                sum3 = sum3 + U1[i_once][o] * A1[k][o]
+                            explicit_gradient1 = explicit_gradient1 + (self.Y[i_once][k] - sum3) * A1[k][a - self.r1]
+
                 if a < self.r1:
                     # 完全负梯度
                     neg_gradient = sum_tensorDec - self.lamda2 * U2[i_once][a]
+                    print("neg_gradient U2[{}][{}]={}".format(i_once,a,neg_gradient),file=logfile)
                     # U2ia更新
                     self.U2[i_once][a] = U2[i_once][a] + self.ita * neg_gradient
 
                     # print("U2[{}][{}]  = {}".format(i_once, a, U2[i_once][a]), file=logfile)
                     # print("↑完全负梯度{}".format(neg_gradient), file=logfile)
                 else:
-                    sum3 = 0
-                    for o in range(self.r):
-                        sum3 = sum3 + U1[i_once][o] * A1[k_once][o]
-                    explicit_gradient1 = (self.Y[i_once][k_once] - sum3) * A1[k_once][a - self.r1]
                     # 完全负梯度
                     neg_gradient = sum_tensorDec - self.lamda2 * U1[i_once][
                         a - self.r1] + self.lamdax * explicit_gradient1
+                    print("neg_gradient U1[{}][{}]={}".format(i_once, a, neg_gradient), file=logfile)
                     # U1ia更新
                     self.U1[i_once][a - self.r1] = U1[i_once][a - self.r1] + self.ita * neg_gradient
                     # print("U1[{}][{}]  = {}".format(i_once, a - self.r1, U1[i_once][a - self.r1]), file=logfile)
@@ -202,6 +218,9 @@ class EETDR:
                 # print("I[{}][{}]  = {}".format(j_once, b, I[j_once][b]), file=logfile)
                 # 稀疏张量分解得到的负梯度
                 sum_tensorDec = 0
+                explicit_gradient2 = 0
+                notsamek_flag = True
+                samek = -1
                 # 如下计算负梯度，公式详见论文
                 # 稀疏张量的取下标。
                 for data in range(self.num_data):
@@ -219,21 +238,33 @@ class EETDR:
                                 temp = G[a1][b][c1] * var3 * A[k][c1]
                                 sum2 += temp
                         sum_tensorDec = sum_tensorDec + e_ijk * sum2
+                        # 避免多次计算同一个k
+                        if samek == k:
+                            notsamek_flag = False
+                        else:
+                            samek = k
+                            notsamek_flag = True
+                        if b >self.r2 and notsamek_flag is True:
+                            sum3 = 0
+                            for o in range(self.r):
+                                sum3 = sum3 + I1[j_once][o] * A1[k][o]
+                            explicit_gradient2 = explicit_gradient2 + self.lamday * (self.Y[j_once][k] - sum3) * A1[k][b - self.r2]
+
+
                 if b < self.r2:
                     # 完全负梯度
                     neg_gradient = sum_tensorDec - self.lamda2 * I2[j_once][b]
+                    print("neg_gradient I2[{}][{}]={}".format(j_once, b, neg_gradient), file=logfile)
                     # I2jb更新
                     self.I2[j_once][b] = I2[j_once][b] + self.ita * neg_gradient
                     # print("I2[{}][{}]  = {}".format(j_once, b, I2[j_once][b]), file=logfile)
                     # print("↑完全负梯度{}".format(neg_gradient), file=logfile)
 
                 else:
-                    sum3 = 0
-                    for o in range(self.r):
-                        sum3 = sum3 + I1[j_once][o] * A1[k_once][o]
-                    explicit_gradient2 = self.lamday * (self.Y[j_once][k_once] - sum3) * A1[k_once][b - self.r2]
+
                     # 完全负梯度
                     neg_gradient = sum_tensorDec - self.lamda2 * I1[j_once][b - self.r2] + explicit_gradient2
+                    print("neg_gradient I1[{}][{}]={}".format(j_once, b, neg_gradient), file=logfile)
                     # I1jb更新
                     self.I1[j_once][b - self.r2] = I1[j_once][b - self.r2] + self.ita * neg_gradient
                     # print("I1[{}][{}]  = {}".format(j_once, b - self.r2, I1[j_once][b - self.r2]), file=logfile)
@@ -248,6 +279,13 @@ class EETDR:
                 # print("A[{}][{}]  = {}".format(k_once, c, A[k_once][c]), file=logfile)
                 # 稀疏张量分解得到的负梯度
                 sum_tensorDec = 0
+                explicit_gradient3 = 0
+                explicit_gradient4 = 0
+                samei = -1
+                samej = -1
+                notsamei_flag = True
+                notsamej_flag = True
+
                 # 如下计算负梯度，公式详见论文
                 # 稀疏张量的取下标。
                 for data in range(self.num_data):
@@ -257,7 +295,7 @@ class EETDR:
                         # e_ijk = self.TensorX[i][j][k_once] - TensorX_approximation[i][j][k_once]
                         e_ijk = 0
                         for count in range(self.num_data):
-                            if Eijk[count][0] is i and Eijk[count][1] is j_once and Eijk[count][2] is k:
+                            if Eijk[count][0] is i and Eijk[count][1] is j and Eijk[count][2] is k_once:
                                 e_ijk = Eijk[count][3]
                         sum2 = 0
                         for a1 in range(rr1):
@@ -266,26 +304,46 @@ class EETDR:
                                 temp = G[a1][b1][c] * I[j][b1] * var3
                                 sum2 += temp
                         sum_tensorDec = sum_tensorDec + e_ijk * sum2
+
+                        # 避免多次计算同一个i
+                        if samei == i:
+                            notsamei_flag = False
+                        else:
+                            samei = i
+                            notsamei_flag = True
+                        if c > self.r3 and notsamei_flag is True:
+                            sum3 = 0
+                            for o in range(self.r):
+                                sum3 = sum3 + U1[i][o] * A1[k_once][o]
+                            explicit_gradient3 = explicit_gradient3 + self.lamdax * (self.Y[i][k_once] - sum3) * U1[i][c - self.r3]
+
+                        # 避免多次计算同一个j
+                        if samej == j:
+                            notsamej_flag = False
+                        else:
+                            samej = j
+                            notsamej_flag = True
+                        if c > self.r3 and notsamej_flag is True:
+                            sum4 = 0
+                            for o in range(self.r):
+                                sum4 = sum4 + I1[j][o] * A1[k_once][o]
+                            explicit_gradient4 = explicit_gradient4 + self.lamday * (self.Z[j][k_once] - sum4) * I1[j][c - self.r3]
+
                 if c < self.r3:
                     # 完全负梯度
                     neg_gradient = sum_tensorDec - self.lamda2 * A2[k_once][c]
+                    print("neg_gradient A2[{}][{}]={}".format(k_once, c, neg_gradient), file=logfile)
                     # A2kc更新
                     self.A2[k_once][c] = A2[k_once][c] + self.ita * neg_gradient
                     # print("A2[{}][{}]  = {}".format(k_once, c, A2[k_once][c]), file=logfile)
                     # print("↑完全负梯度{}".format(neg_gradient), file=logfile)
 
                 else:
-                    sum3 = 0
-                    sum4 = 0
-                    for o in range(self.r):
-                        sum3 = sum3 + U1[i_once][o] * A1[k_once][o]
-                        sum4 = sum4 + I1[j_once][o] * A1[k_once][o]
 
-                    explicit_gradient3 = self.lamdax * (self.Y[i_once][k_once] - sum3) * U1[i_once][c - self.r3]
-                    explicit_gradient4 = self.lamday * (self.Z[j_once][k_once] - sum3) * I1[j_once][c - self.r3]
                     # 完全负梯度
                     neg_gradient = sum_tensorDec - self.lamda2 * A1[k_once][
                         c - self.r3] + explicit_gradient3 + explicit_gradient4
+                    print("neg_gradient A1[{}][{}]={}".format(k_once, c, neg_gradient), file=logfile)
                     # A1kc更新
                     self.A1[k_once][c - self.r3] = A1[k_once][c - self.r3] + self.ita * neg_gradient
                     # print("A1[{}][{}]  = {}".format(k_once, c - self.r3, A1[k_once][c - self.r3]), file=logfile)
@@ -296,42 +354,7 @@ class EETDR:
         self.U, self.I, self.A = np.concatenate((self.U1, self.U2), axis=1), \
                                  np.concatenate((self.I1, self.I2), axis=1), \
                                  np.concatenate((self.A1, self.A2), axis=1)
-        # factors = [self.U, self.I, self.A]
-        # print("重构核张量")
-        # modes1 = list(range(_tucker.T.ndim(self.TensorX)))
-        # self.G = _tucker.multi_mode_dot(self.TensorX, factors, modes=modes1, transpose=True)
-        # print("重构X张量")
-        # modes2 = list(range(_tucker.T.ndim(self.G)))
-        # TensorX_approximation = _tucker.multi_mode_dot(self.G, factors, modes=modes2, transpose=False)
-        # print("计算重构误差")
-        ####################################################################################################
-        # L2_U2 = _tucker.T.norm(self.U2, 2)
-        # L2_U1 = _tucker.T.norm(self.U1, 2)
-        # L2_I2 = _tucker.T.norm(self.I2, 2)
-        # L2_I1 = _tucker.T.norm(self.I1, 2)
-        # L2_A2 = _tucker.T.norm(self.A2, 2)
-        # L2_A1 = _tucker.T.norm(self.A1, 2)
-        # L2_G = _tucker.T.norm(self.G, 2)
-        # norm_tensor = _tucker.T.norm(self.TensorX, 2)
-        # rec_error = _tucker.sqrt(abs(norm_tensor ** 2 - _tucker.T.norm(TensorX_approximation, 2) ** 2)) / norm_tensor
-        # norm_Y = _tucker.T.norm(self.Y, 2)
-        # rec_Y = _tucker.sqrt(abs(norm_Y ** 2 - _tucker.T.norm((U1.dot(A1.transpose())), 2) ** 2)) / norm_Y
-        # norm_Z = _tucker.T.norm(self.Z, 2)
-        # rec_Z = _tucker.sqrt(abs(norm_Z ** 2 - _tucker.T.norm((I1.dot(A1.transpose())), 2) ** 2)) / norm_Z
-        # E = self.lamda1 * (L2_U1 + L2_A1 + L2_I1) + self.lamda2 * (L2_U2 + L2_A2 + L2_I2) + self.lamda3 * L2_G
-        # final_error = rec_error + self.lamdax * rec_Y + self.lamday * rec_Z + self.lamda1 * (
-        #         L2_U1 + L2_A1 + L2_I1) + self.lamda2 * (L2_U2 + L2_A2 + L2_I2) + self.lamda3 * L2_G
-        # print(E)
-        # print("rec_error={} rec_Y={} rec_Z={} final={}".format(rec_error, rec_Y, rec_Z, final_error))
-        # print(" finalY+Z={}".format(rec_Y + rec_Z),
-        #       file=logfile)
-        # print("rec_error={} rec_Y={} rec_Z={} final={}".format(rec_error, rec_Y, rec_Z, final_error),
-        #       file=logfile)
-        # self.rec_errors.append(final_error)
-        # print("Once OK，rec={}".format(self.rec_errors), file=logfile)
-        # if len(self.rec_errors) > 2:
-        #     print("Once OK，总误差下降幅度{}".format(self.rec_errors[-2] - self.rec_errors[-1]))
-        #     print("Once OK，总误差下降幅度{}".format(self.rec_errors[-2] - self.rec_errors[-1]), file=logfile)
+
 
         return self.rec_errors, self.G, self.U, self.I, self.A
 
@@ -348,7 +371,7 @@ if __name__ == "__main__":
     # 文件加载初始值####################################################################################
     pathdir = "E:/PYworkspace/EETDR/"
     randominit = True
-    already = 5  # 指定从哪一次继续训练
+    already = 0  # 指定从哪一次继续训练
     X1 = np.load(pathdir + "/data/preprodata/X300.npy")
     Y1 = np.load(pathdir + "/data/preprodata/UA300.npy")
     Z1 = np.load(pathdir + "/data/preprodata/IA300.npy")
@@ -384,18 +407,18 @@ if __name__ == "__main__":
     count = already
     while flag:
         count += 1
-        logfile = open(pathdir + "/result/log/log_fast_300Final_0.1.txt", "a")
+        logfile = open(pathdir + "/result/log/log_fast_300_RE_64_final.txt", "a")
         print("从第0次开始使用小批量，第{}次小批量(50)".format(count), file=logfile)
         rec_errors, reG, reU, reI, reA = fine.eetdr_SGDonce()
-        np.save(pathdir + "/result/intermediat_result2/300_0.1/reG" + str(count), reG)
-        np.save(pathdir + "/result/intermediat_result2/300_0.1/reU" + str(count), reU)
-        np.save(pathdir + "/result/intermediat_result2/300_0.1/reI" + str(count), reI)
-        np.save(pathdir + "/result/intermediat_result2/300_0.1/reA" + str(count), reA)
+        np.save(pathdir + "/result/300_RE_64_final/reG" + str(count), reG)
+        np.save(pathdir + "/result/300_RE_64_final/reU" + str(count), reU)
+        np.save(pathdir + "/result/300_RE_64_final/reI" + str(count), reI)
+        np.save(pathdir + "/result/300_RE_64_final/reA" + str(count), reA)
         print(rec_errors)
         print(rec_errors, file=logfile)
         if len(rec_errors) > 2:
             print("RiseRate = {}".format(rec_errors[-1] - rec_errors[-2]))
             print("RiseRate = {}".format(rec_errors[-1] - rec_errors[-2]), file=logfile)
-            if rec_errors[-2] - rec_errors[-1] < 1 or count > 500:
+            if rec_errors[-2] - rec_errors[-1] < 0.1 or count > 5000:
                 flag = False
         logfile.close()

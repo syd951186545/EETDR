@@ -1,3 +1,6 @@
+"""
+DCG,NDCG的计算，需要提供rank
+"""
 import numpy as np
 
 # change this if using K > 100
@@ -94,13 +97,14 @@ def get_ndcg( r, k, method = 1 ):
 # ndcg with explicitly given best and worst possible relevances
 # for recommendations including unrated movies
 def get_ndcg_2( r, best_r, worst_r, k, method = 1 ):
-
-	dcg_max = dcg_at_k( sorted( best_r, reverse = True ), k, method )
-	
-	if worst_r == None:
-		dcg_min = 0.
-	else:
-		dcg_min = dcg_at_k( sorted( worst_r ), k, method )
+	dcg_max=best_r
+	dcg_min = worst_r
+	# dcg_max = dcg_at_k( sorted( best_r, reverse = True ), k, method )
+	#
+	# if worst_r == None:
+	# 	dcg_min = 0.
+	# else:
+	# 	dcg_min = dcg_at_k( sorted( worst_r ), k, method )
 		
 	# assert( dcg_max >= dcg_min )
 	
